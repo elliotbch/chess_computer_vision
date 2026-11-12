@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fidélité du site statique</title>
+<style>
+:root { --bg: #f7f8fa; --card: #fff; --border: #e3e6ec; --text: #1b2333; --muted: #5b6475; --ok: #1f7a4d; --warn: #b54708; }
+@media (prefers-color-scheme: dark) { :root { --bg: #0f141c; --card: #171e29; --border: #2a3342; --text: #e6e9ef; --muted: #a3acbb; --ok: #4cc38a; --warn: #f0a35c; } }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+.wrap { max-width: 980px; margin: 0 auto; padding: 20px 16px 40px; }
+h1 { font-size: 1.3rem; margin: 0 0 6px; }
+p { color: var(--muted); margin: 4px 0 12px; }
+table { border-collapse: collapse; width: 100%; background: var(--card); }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); }
+.ok { color: var(--ok); font-weight: 600; } .bad { color: var(--warn); font-weight: 600; }
+#summary { font-weight: 600; margin: 12px 0; }
+code { font-size: .85em; }
+.tablewrap { overflow-x: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Fidélité : site statique (Pyodide) contre démo FastAPI</h1>
+<p>Compare les réponses du Web Worker du site (<code>assets/worker.js</code>, même code Python) à <code>reference.json</code>, écrit par <code>make_reference.py</code> à partir de la démo FastAPI : chaque partie d'exemple observée à partir des coups 1, 9 et 25, deux parties importées, et les 6 photos d'exemple. Tolérances : probabilité du type le plus probable à 1e-9 près, coins à 1 px près ; tout le reste doit être identique.</p>
+<div id="summary">Chargement…</div>
+<div class="tablewrap"><table><thead><tr><th>Cas</th><th>Résultat</th></tr></thead><tbody id="rows"></tbody></table></div>
+</div>
+<script src="compare.js"></script>
+<script>
+(async () => {
+  const $ = (id) => document.getElementById(id);
+  const fmt = (v, d = 1) => Number(v).toLocaleString("fr-FR", { maximumFractionDigits: d });
+  const row = (a, b, ok) => { const tr = document.createElement("tr"); tr.innerHTML = `<td>${a}</td><td class="${ok === undefined ? "" : ok ? "ok" : "bad"}">${b}</td>`; $("rows").appendChild(tr); };
+  const result = { replays: [], photos: [], load: {}, ok: false };
+  window.parityResult = result;
+  const ref = await (await fetch("reference.json", { cache: "no-cache" })).json();
+  const worker = new Worker("../assets/worker.js");
+  let nextId = 1; const pending = new Map(); const ready = {};
+  const t0 = performance.now();
+  worker.onmessage = (e) => {
+    const m = e.data;
+    if (m.type === "progress") $("summary").textContent = `Chargement (${m.phase}) : ${fmt(m.loaded / 1e6)} / ${fmt(m.total / 1e6)} Mo`;
+    else if (m.type === "ready") { result.load[m.phase] = { ms: m.ms, bytes: m.bytes, transferred: m.transferred, info: m.info }; ready[m.phase](); }
+    else if (m.type === "result") { pending.get(m.id).resolve(m); pending.delete(m.id); }
+    else if (m.type === "error") {
+      if (m.phase) $("summary").textContent = "Échec du chargement : " + m.message;
+      else { pending.get(m.id).resolve({ data: { error: m.message, status: 500 } }); pending.delete(m.id); }
+    }
+  };
+  // ?froid : ignore le Cache API et le cache HTTP pour mesurer un premier chargement
+  const cold = new URLSearchParams(location.search).has("froid");
+  const load = (phase) => new Promise((r) => { ready[phase] = r; worker.postMessage({ type: phase, noCache: cold }); });
+  const call = (msg, transfer) => { const id = nextId++; return new Promise((resolve) => { pending.set(id, { resolve }); worker.postMessage(Object.assign({ id }, msg), transfer || []); }); };
+  const asGot = (d) => d.error ? { status: d.status, body: { error: d.error } } : { status: 200, body: d };
+
+  await load("init");
+  result.load.page_to_python_ms = performance.now() - t0;
+  let bad = 0, plyTimes = [];
+  for (const r of ref.replays) {
+    const m = await call({ type: "replay", req: r.req });
+    const c = ParityCompare.compareReplay(r, asGot(m.data));
+    const ms = (m.data.steps || []).slice(1).map((s) => s.ms);
+    plyTimes.push(...ms);
+    result.replays.push({ id: r.id, ok: c.ok, steps: c.steps, same: c.same, maxP: c.maxP, wall_ms: m.wall_ms, diffs: c.diffs });
+    bad += !c.ok;
+    const what = r.status === 200 ? `${c.ok ? "identique" : "DIFFÉRENT"} : ${c.same}/${c.steps} demi-coups (types possibles, certitudes, plus probable), max |Δp| ${c.maxP.toExponential(0)} ; ${fmt(m.wall_ms, 0)} ms`
+      : `${c.ok ? "identique" : "DIFFÉRENT"} : même refus (« ${r.body.error} »)`;
+    row(r.label, what + (c.ok ? "" : "<br><code>" + c.diffs.slice(0, 3).join("<br>") + "</code>"), c.ok);
+  }
+  const tv = performance.now();
+  await load("vision");
+  result.load.vision_wall_ms = performance.now() - tv;
+  for (const p of ref.photos) {
+    const bytes = await (await fetch(`../assets/examples/${p.id}.png`)).arrayBuffer();
+    const m = await call({ type: "analyze", example: p.id, bytes }, [bytes]);
+    const c = ParityCompare.comparePhoto(p, asGot(m.data));
+    result.photos.push({ id: p.id, ok: c.ok, cells: c.cells, same: c.sameCells, maxCorner: c.maxCorner, wall_ms: m.wall_ms, api_ms: p.timing_ms && p.timing_ms.total, diffs: c.diffs });
+    bad += !c.ok;
+    row(`Photo ${p.id} (${p.label})`, `${c.ok ? "identique" : "DIFFÉRENT"} : ${c.sameCells}/${c.cells} cases, écart max des coins ${fmt(c.maxCorner, 2)} px ; ${fmt(m.wall_ms, 0)} ms (API ${p.timing_ms ? p.timing_ms.total : "–"} ms)` +
+      (c.ok ? "" : "<br><code>" + c.diffs.slice(0, 3).join("<br>") + "</code>"), c.ok);
+  }
+  plyTimes.sort((a, b) => a - b);
+  result.ply_ms = { n: plyTimes.length, mean: plyTimes.reduce((a, b) => a + b, 0) / plyTimes.length, median: plyTimes[plyTimes.length >> 1], max: plyTimes[plyTimes.length - 1] };
+  result.ok = bad === 0;
+  result.load.vision.transferred -= result.load.init.transferred;      // le worker donne un cumul
+  const tr = (l) => `${fmt(l.bytes / 1e6)} Mo décompressés, ${fmt(l.transferred / 1e6)} Mo transférés depuis le CDN`;
+  row(`Chargement de Pyodide + NumPy + code du dépôt (${cold ? "à froid, sans cache" : "caches autorisés"})`, `${fmt(result.load.init.ms, 0)} ms (${tr(result.load.init)})`);
+  row(`Chargement d'OpenCV + préchauffage (${cold ? "à froid" : "caches autorisés"})`, `${fmt(result.load.vision.ms, 0)} ms (${tr(result.load.vision)})`);
+  row("Temps par demi-coup (moteur, dans le navigateur)", `moyenne ${fmt(result.ply_ms.mean, 2)} ms, médiane ${fmt(result.ply_ms.median, 2)} ms, max ${fmt(result.ply_ms.max, 1)} ms (${result.ply_ms.n} demi-coups)`);
+  $("summary").textContent = bad ? `${bad} cas différent(s) sur ${ref.replays.length + ref.photos.length}` : `Fidélité : ${ref.replays.length} rejeux et ${ref.photos.length} photos identiques à la démo FastAPI.`;
+  $("summary").className = bad ? "bad" : "ok";
+})();
+</script>
+</body>
+</html>

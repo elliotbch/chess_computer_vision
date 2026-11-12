@@ -1,0 +1,84 @@
+{
+ "examples": [
+  {
+   "id": "frame06",
+   "file": "frame06.jpg",
+   "label": "Position de départ",
+   "note": "image de test",
+   "url": "assets/examples/frame06.jpg",
+   "pixels": "assets/examples/frame06.png"
+  },
+  {
+   "id": "frame08",
+   "file": "frame08.jpg",
+   "label": "Petite image, milieu de partie",
+   "note": "image de test",
+   "url": "assets/examples/frame08.jpg",
+   "pixels": "assets/examples/frame08.png"
+  },
+  {
+   "id": "frame09",
+   "file": "frame09.jpg",
+   "label": "Coin caché par une main",
+   "note": "image de développement",
+   "url": "assets/examples/frame09.jpg",
+   "pixels": "assets/examples/frame09.png"
+  },
+  {
+   "id": "frame05",
+   "file": "frame05.jpg",
+   "label": "Plateau tourné, fin de partie",
+   "note": "image de développement",
+   "url": "assets/examples/frame05.jpg",
+   "pixels": "assets/examples/frame05.png"
+  },
+  {
+   "id": "frame07",
+   "file": "frame07.jpg",
+   "label": "Main au-dessus du plateau",
+   "note": "image de développement",
+   "url": "assets/examples/frame07.jpg",
+   "pixels": "assets/examples/frame07.png"
+  },
+  {
+   "id": "frame20",
+   "file": "frame20.jpg",
+   "label": "Pièces en relief (capsules et vis)",
+   "note": "image de test, autre type de marqueur",
+   "url": "assets/examples/frame20.jpg",
+   "pixels": "assets/examples/frame20.png"
+  }
+ ],
+ "games": [
+  {
+   "id": "gameLR_fix",
+   "label": "Partie annotée 1 (caméra fixe)",
+   "note": "partie filmée du projet, états annotés à la main",
+   "file": "gameLR_fix.json"
+  },
+  {
+   "id": "gameLR_mov",
+   "label": "Partie annotée 2 (caméra mobile)",
+   "note": "partie filmée du projet, états annotés à la main",
+   "file": "gameLR_mov.json"
+  },
+  {
+   "id": "opera_1858",
+   "label": "Partie de l'Opéra (Morphy, 1858)",
+   "note": "domaine public",
+   "file": "opera_1858.pgn"
+  },
+  {
+   "id": "immortelle_1851",
+   "label": "L'Immortelle (Anderssen – Kieseritzky, 1851)",
+   "note": "domaine public",
+   "file": "immortelle_1851.pgn"
+  },
+  {
+   "id": "toujours_vert_1852",
+   "label": "La Toujours Verte (Anderssen – Dufresne, 1852)",
+   "note": "domaine public",
+   "file": "toujours_vert_1852.pgn"
+  }
+ ]
+}

@@ -1,0 +1,10 @@
+[
+ "chessrules.py",
+ "demo_glue.py",
+ "logic.py",
+ "occupancy.py",
+ "piece_inference.py",
+ "replay.py",
+ "robust_calibration.py",
+ "web_demo.py"
+]

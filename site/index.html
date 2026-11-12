@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vision d'échiquier</title>
+<meta name="description" content="Identifier, coup par coup, le type de pièces d'échecs remplacées par des marqueurs identiques, à partir de leurs seuls déplacements ; trouver l'échiquier sur une photo et détecter les cases occupées.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f8fa; --card: #ffffff; --border: #e3e6ec; --text: #1b2333; --muted: #5b6475;
+  --accent: #1e3a5f; --accent-soft: #e8eef6; --ok: #1f7a4d; --warn: #b54708;
+  --light-sq: #eef1f5; --dark-sq: #9aa8bb;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f141c; --card: #171e29; --border: #2a3342; --text: #e6e9ef; --muted: #a3acbb;
+          --accent: #8fb3e0; --accent-soft: #1f2a3a; --ok: #4cc38a; --warn: #f0a35c;
+          --light-sq: #c9d2de; --dark-sq: #6d7d93; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+       font: 15px/1.55 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { margin: 0 0 6px; font-size: 1.6rem; letter-spacing: -0.01em; }
+header p { margin: 0 0 10px; color: var(--muted); max-width: 780px; }
+.links { display: flex; gap: 16px; flex-wrap: wrap; font-weight: 500; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-top: 18px; }
+.card h2 { margin: 0 0 12px; font-size: 1.1rem; }
+.examples { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ex { border: 2px solid var(--border); border-radius: 10px; padding: 0; background: var(--card); cursor: pointer; text-align: left; color: var(--text); font: inherit; overflow: hidden; }
+.ex img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+.ex span { display: block; padding: 6px 8px; font-size: .85rem; font-weight: 500; }
+.ex[aria-pressed="true"] { border-color: var(--accent); }
+button.btn { font: inherit; border-radius: 8px; border: 1px solid var(--accent); background: var(--card); color: var(--accent); padding: 7px 13px; cursor: pointer; font-weight: 500; }
+button.btn.primary, button.btn[aria-pressed="true"] { background: var(--accent); color: var(--card); }
+button.btn:disabled { opacity: .45; cursor: default; }
+.upload { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); }
+.upload input { max-width: 100%; }
+.status { margin-top: 10px; min-height: 1.4em; color: var(--muted); }
+.status.error { color: var(--warn); font-weight: 500; }
+.results { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.panel { min-width: 0; }
+.panel h3 { margin: 0 0 6px; font-size: .95rem; color: var(--muted); font-weight: 600; }
+.panel img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); }
+.facts { display: flex; gap: 18px; flex-wrap: wrap; font-size: .9rem; color: var(--muted); margin-top: 12px; }
+.facts b { color: var(--text); }
+.board-wrap { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.board { display: grid; grid-template-columns: 18px repeat(8, minmax(0, 1fr)); width: min(100%, 360px); font-size: .75rem; color: var(--muted); }
+.board .sq { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 5.2vw, 30px); line-height: 1; position: relative; }
+.board .l { background: var(--light-sq); } .board .d { background: var(--dark-sq); }
+.board .lab { display: flex; align-items: center; justify-content: center; }
+.board .sq.wrong::after { content: ""; position: absolute; inset: 2px; border: 2px solid var(--warn); border-radius: 3px; }
+.board .sq.moved { box-shadow: inset 0 0 0 3px rgba(30, 140, 255, .55); }
+.pc-w { color: #fff; text-shadow: 0 0 2px #000, 0 0 1px #000; }
+.pc-b { color: #111; text-shadow: 0 0 2px rgba(255,255,255,.7); }
+.unk { font-size: .62em; font-weight: 700; width: 66%; height: 66%; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.unk.w { background: #fff; color: #111; border: 2px solid #111; } .unk.b { background: #111; color: #fff; border: 2px solid #fff; }
+.seqbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.seqbar input[type=range] { flex: 1 1 200px; accent-color: var(--accent); }
+.move { font-size: 1.05rem; font-weight: 600; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; word-break: break-all; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; margin-top: 8px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+td.num { font-variant-numeric: tabular-nums; }
+.small { font-size: .85rem; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+.mk { width: 84%; height: 84%; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; position: relative; }
+.mk.w { background: #fff; color: #111; border: 2px solid #111; } .mk.b { background: #1b1f27; color: #f2f2f2; border: 2px solid #f2f2f2; }
+.mk .glyph { font-size: clamp(16px, 4.4vw, 26px); }
+.mk .mp { font-size: clamp(12px, 3vw, 17px); font-weight: 800; opacity: .8; }
+.mk .mp small { font-size: .6em; font-weight: 600; }
+.mk .cands { font-size: clamp(6px, 1.5vw, 8.5px); letter-spacing: .03em; font-weight: 500; white-space: nowrap; max-width: 92%; overflow: hidden; }
+.mk.certain { box-shadow: 0 0 0 2px var(--ok); }
+.sq.fresh .mk { box-shadow: 0 0 0 4px var(--ok); animation: pop .5s ease-out; }
+@keyframes pop { from { transform: scale(.6); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .sq.fresh .mk { animation: none; } }
+.truth { position: absolute; left: 2px; bottom: 1px; font-size: 9px; font-weight: 700; color: #111; background: rgba(255,255,255,.85); border-radius: 3px; padding: 0 2px; }
+.board .sq.from { box-shadow: inset 0 0 0 3px rgba(30, 140, 255, .55); }
+.board.big { width: min(100%, 440px); }
+.replay-grid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 10px; }
+.stat { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: .9rem; }
+.stat b { font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.log { max-height: 220px; overflow-y: auto; font-size: .85rem; margin: 6px 0 0; padding-left: 18px; }
+.log li.cur { font-weight: 700; }
+.import { margin-top: 10px; }
+.import summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+.import textarea, .import input[type=text] { width: 100%; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); color: var(--text); }
+.import label { display: block; margin: 8px 0 4px; font-size: .85rem; color: var(--muted); }
+.startbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.startbar input[type=range] { flex: 1 1 220px; accent-color: var(--accent); }
+.chk { font-size: .85rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+#gameButtons { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 760px) { .results, .replay-grid { grid-template-columns: minmax(0, 1fr); } }
+.loadbar { margin-top: 12px; font-size: .85rem; color: var(--muted); }
+.loadbar progress { display: block; width: 100%; max-width: 420px; height: 8px; margin-top: 4px; accent-color: var(--accent); }
+.local { margin: 8px 0 0; font-size: .8rem; color: var(--muted); }
+.nowasm { margin-top: 18px; padding: 14px 18px; border-radius: 12px; border: 1px solid var(--warn); color: var(--warn); font-weight: 500; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Vision d'échiquier : pièces inconnues</h1>
+  <p>Les pièces sont remplacées par des marqueurs identiques (un par camp, des post-it par exemple) : seul le camp est visible. La démo déduit le type de chaque marqueur de ses seuls déplacements, coup par coup, même si l'observation commence en cours de partie, et sépare les pièces identifiées avec certitude des types seulement probables. Elle montre aussi l'étape de vision : trouver l'échiquier sur une photo et détecter les cases occupées.</p>
+  <div class="links">
+    <a href="https://github.com/elliotbch/chess_computer_vision">Code sur GitHub</a>
+    <a href="https://www.malt.fr/profile/elliotbouchy1">Elliot Bouchy sur Malt</a>
+  </div>
+  <p class="local">Calcul effectué dans votre navigateur : aucune donnée n'est envoyée.</p>
+  <div class="nowasm" id="noWasm" role="alert" hidden>Votre navigateur ne prend pas en charge WebAssembly : la démo ne peut pas s'exécuter ici. Essayez une version récente de Firefox, Chrome, Edge ou Safari.</div>
+</header>
+
+<section class="card" aria-labelledby="seq">
+  <h2 id="seq">Essayer : identifier les pièces inconnues coup par coup</h2>
+  <p class="small" style="margin-top:0">Le moteur ne reçoit que l'occupation des cases (marqueur blanc, marqueur noir, vide) après chaque coup : ni les types, ni la position de départ, ni les droits de roque. Un marqueur dont tous les types sauf un sont exclus par les règles est <b>identifié avec certitude</b> (symbole de la pièce) ; sinon, la grande lettre suivie de « ? » donne le type le plus probable et la petite ligne les types encore possibles (R roi, D dame, T tour, F fou, C cavalier, P pion). Survolez un marqueur pour les probabilités.</p>
+  <div id="gameButtons" role="group" aria-label="Parties d'exemple"></div>
+  <div class="loadbar" id="pyLoad" hidden><span id="pyLoadText">Chargement de Python dans le navigateur (Pyodide)…</span><progress id="pyLoadBar" max="1" value="0"></progress></div>
+  <details class="import">
+    <summary>Importer une partie (PGN, ou FEN + coups)</summary>
+    <label for="pgnIn">PGN (coups en notation algébrique ; une balise [FEN "…"] est prise en compte)</label>
+    <textarea id="pgnIn" rows="4" placeholder="1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 …"></textarea>
+    <label for="fenIn">Ou une position FEN…</label>
+    <input type="text" id="fenIn" placeholder="r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3">
+    <label for="movesIn">…suivie des coups (Nf3, exd5, O-O, ou e2e4, e7e8q)</label>
+    <textarea id="movesIn" rows="2" placeholder="Bb5 a6 Ba4 Nf6 O-O"></textarea>
+    <div style="margin-top:8px"><button class="btn primary" type="button" id="importBtn">Rejouer cette partie</button></div>
+  </details>
+  <div class="startbar" id="startBar" hidden>
+    <label for="startRange">Commencer l'observation au&nbsp;:</label>
+    <input type="range" id="startRange" min="0" max="0" value="0">
+    <b id="startLabel"></b>
+  </div>
+  <div class="status" id="replayStatus" role="status" aria-live="polite"></div>
+  <div id="seqView" hidden>
+    <div class="seqbar">
+      <button class="btn" id="prev" aria-label="Demi-coup précédent">◀ Préc.</button>
+      <input type="range" id="stepRange" min="0" max="0" value="0" aria-label="Demi-coups observés">
+      <button class="btn" id="next" aria-label="Demi-coup suivant">Suiv. ▶</button>
+      <button class="btn primary" id="playSeq">Lecture</button>
+    </div>
+    <div class="move" id="moveText" aria-live="polite"></div>
+    <div class="replay-grid">
+      <div>
+        <div class="board big" id="dedBoard" aria-label="Marqueurs et types déduits"></div>
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="showTruth"> Afficher le vrai type (petite étiquette, pour vérifier)</label>
+      </div>
+      <div>
+        <div class="stat" id="seqFacts"></div>
+        <h3 class="small" style="margin:14px 0 4px">Pièces identifiées / demi-coups observés</h3>
+        <div class="chart" id="chart"></div>
+        <div class="legend" id="chartLegend"></div>
+        <h3 class="small" style="margin:14px 0 0">Journal des identifications certaines</h3>
+        <ol class="log" id="identLog"></ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="try">
+  <h2 id="try">Étape de vision : analyser une photo</h2>
+  <div class="examples" id="examples" role="group" aria-label="Photos d'exemple"></div>
+  <div class="upload">
+    <label for="file">Ou importez la photo d'un plateau portant les pastilles d'orientation rose et bleue (JPEG/PNG, 12&nbsp;Mo au maximum)&nbsp;:</label>
+    <input type="file" id="file" accept="image/jpeg,image/png">
+  </div>
+  <div class="loadbar" id="cvLoad" hidden><span id="cvLoadText">Chargement du module de vision (OpenCV)…</span><progress id="cvLoadBar" max="1" value="0"></progress></div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div id="result" hidden>
+    <div class="results">
+      <div class="panel"><h3>Plateau détecté : coins et grille</h3><img id="inputImg" alt="Photo d'entrée avec la grille et les coins du plateau détectés"></div>
+      <div class="panel"><h3>Vue de dessus : cases occupées (disque blanc = camp blanc, disque noir = camp noir)</h3><img id="topImg" alt="Vue de dessus redressée du plateau, cases occupées encadrées"></div>
+    </div>
+    <div class="facts" id="facts"></div>
+    <div class="board-wrap" style="margin-top:14px">
+      <div><h3 class="small" style="margin:0 0 6px">Occupation sous forme de diagramme (types inconnus à partir d'une seule photo)</h3><div class="board" id="photoBoard" aria-label="Diagramme d'occupation détecté"></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="how">
+  <h2 id="how">Comment ça marche</h2>
+  <ul>
+    <li><b>Calibration :</b> les marqueurs colorés sont effacés par inpainting, puis <code>findChessboardCornersSB</code> d'OpenCV cherche les 7×7 coins intérieurs. Si une main cache une partie du plateau, une sous-grille plus petite est acceptée et sa position dans le plateau 8×8 est choisie en vérifiant l'alternance clair/foncé. Les pastilles rose et bleue donnent l'orientation (a1, a8).</li>
+    <li><b>Vue de dessus :</b> une homographie projette le plateau sur une image de 800×800 (100&nbsp;px par case).</li>
+    <li><b>Occupation :</b> pour chaque case, écart de couleur entre le centre et le bord, saturation, densité de contours et contraste ; une régression logistique à 4 variables (ou un seuil adaptatif) décide vide / occupée ; la teinte du marqueur donne le camp.</li>
+    <li><b>Pièces inconnues :</b> chaque marqueur est une variable dont le domaine est l'ensemble des types encore possibles. Chaque coup observé restreint le marqueur qui bouge (géométrie, sans saut sauf le cavalier ; pion : avance, double pas depuis sa 2e rangée, prise en diagonale, en passant, promotion ; le roque désigne le roi et la tour). S'y ajoutent des règles vraies dans toute position : un seul roi par camp, jamais de pion sur la 1re ou la 8e rangée, pions + pièces promues en surplus ≤ 8 (fous comptés par couleur de case), 32 marqueurs présents donc aucune promotion, le camp qui vient de jouer n'est pas en échec. Les exclusions se propagent (couplage marqueurs / pièces pour le dénombrement) : une certitude est une preuve, jamais un pari.</li>
+    <li><b>Le plus probable :</b> pour les marqueurs encore ambigus, une régression logistique apprise sur 4 000 parties lichess (licence CC0), distinctes des parties de test, classe les types restants. Elle tient compte de la case actuelle du marqueur ; elle ne sert jamais aux certitudes.</li>
+  </ul>
+  <h3 class="small" style="margin:14px 0 0">Résultats mesurés</h3>
+  <div class="tablewrap"><table id="metricsTable"><tbody><tr><td>Chargement…</td></tr></tbody></table></div>
+  <p class="small" id="metricsNote"></p>
+</section>
+</div>
+
+<script src="assets/app.js"></script>
+</body>
+</html>

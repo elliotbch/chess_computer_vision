@@ -1,0 +1,359 @@
+{
+ "description": "Vérité terrain annotée à la main (novembre 2026) pour les images de data/sample_frames/. Voir data/ground_truth/README.md.",
+ "conventions": {
+  "corners": "coins externes de la zone 8x8 en pixels de l'image d'origine, ordre a1, a8, h8, h1 (a1 près du sticker bleu, a8 près du sticker rose)",
+  "occupancy": "8 chaînes = colonnes a..h ; dans chaque chaîne, caractère i = rangée i+1. W = marqueur du camp blanc (post-it vert, vis métallique sur frame20), B = camp noir (post-it jaune, capsule dorée sur frame20), . = case vide, ? = case cachée (main), exclue des métriques"
+ },
+ "duplicates": {
+  "frame10": "frame07 (fichier identique octet pour octet, exclu des métriques)"
+ },
+ "split": {
+  "dev": [
+   "frame00",
+   "frame03",
+   "frame05",
+   "frame07",
+   "frame09"
+  ],
+  "test": [
+   "frame01",
+   "frame02",
+   "frame04",
+   "frame06",
+   "frame08",
+   "frame20"
+  ]
+ },
+ "frames": {
+  "frame00": {
+   "corners": [
+    [
+     1015.6,
+     747.7
+    ],
+    [
+     265.5,
+     584.5
+    ],
+    [
+     547.1,
+     171.9
+    ],
+    [
+     1105.5,
+     268.0
+    ]
+   ],
+   "occupancy": [
+    "WW....BB",
+    "WW....BB",
+    "W..W..BB",
+    "W..W..BB",
+    "WW....BB",
+    "WW...BBB",
+    "WW...B..",
+    "WW....BB"
+   ]
+  },
+  "frame01": {
+   "corners": [
+    [
+     1176.9,
+     435.4
+    ],
+    [
+     734.8,
+     681.1
+    ],
+    [
+     418.9,
+     386.9
+    ],
+    [
+     829.4,
+     230.8
+    ]
+   ],
+   "occupancy": [
+    "WW....BB",
+    ".W....BB",
+    "W.WW..BB",
+    "W...WB.B",
+    "WW.WB...",
+    ".WW..BBB",
+    ".W...BBB",
+    "WW....B."
+   ]
+  },
+  "frame02": {
+   "corners": [
+    [
+     891.6,
+     756.7
+    ],
+    [
+     209.2,
+     589.8
+    ],
+    [
+     527.6,
+     194.9
+    ],
+    [
+     1060.7,
+     279.5
+    ]
+   ],
+   "occupancy": [
+    "WW..BB.B",
+    ".W....B.",
+    "..WW..BB",
+    "W...WB.B",
+    "WW.WB...",
+    ".WW..BBB",
+    ".W...BBB",
+    "WW.W.B.."
+   ]
+  },
+  "frame03": {
+   "corners": [
+    [
+     1232.3,
+     407.3
+    ],
+    [
+     634.8,
+     650.3
+    ],
+    [
+     390.6,
+     240.6
+    ],
+    [
+     893.6,
+     100.4
+    ]
+   ],
+   "occupancy": [
+    "W.W.BB.B",
+    "..W...B.",
+    "..WW..B.",
+    "WW..WBB.",
+    ".W.WB..B",
+    "WW...BBB",
+    "WW...B.B",
+    ".W.W.BB."
+   ]
+  },
+  "frame04": {
+   "corners": [
+    [
+     1110.7,
+     563.1
+    ],
+    [
+     547.7,
+     743.5
+    ],
+    [
+     370.9,
+     386.3
+    ],
+    [
+     837.4,
+     288.5
+    ]
+   ],
+   "occupancy": [
+    "..W.BB.B",
+    "W..W.B..",
+    ".WWW..B.",
+    ".W..WBB.",
+    ".W.WB..B",
+    "WW??B..B",
+    "W??..B.B",
+    "???..BB."
+   ]
+  },
+  "frame05": {
+   "corners": [
+    [
+     697.6,
+     768.4
+    ],
+    [
+     283.9,
+     384.4
+    ],
+    [
+     759.3,
+     155.3
+    ],
+    [
+     1184.0,
+     406.7
+    ]
+   ],
+   "occupancy": [
+    ".......B",
+    "W....B..",
+    ".WWWW...",
+    "....W.B.",
+    ".W..B...",
+    "W...B...",
+    "...W.B.B",
+    "WW...BBB"
+   ]
+  },
+  "frame06": {
+   "corners": [
+    [
+     977.3,
+     307.7
+    ],
+    [
+     544.6,
+     589.1
+    ],
+    [
+     192.2,
+     288.1
+    ],
+    [
+     609.5,
+     109.4
+    ]
+   ],
+   "occupancy": [
+    "WW....BB",
+    "WW....BB",
+    "WW....BB",
+    "W..W..BB",
+    "WW....BB",
+    "WW....BB",
+    "WW....BB",
+    "WW....BB"
+   ]
+  },
+  "frame07": {
+   "corners": [
+    [
+     825.5,
+     620.3
+    ],
+    [
+     44.2,
+     606.5
+    ],
+    [
+     158.0,
+     151.4
+    ],
+    [
+     728.1,
+     165.7
+    ]
+   ],
+   "occupancy": [
+    "WW....BB",
+    "???...BB",
+    "???W..BB",
+    "W??W..BB",
+    "W?....BB",
+    "WW...BBB",
+    "WW....B.",
+    "WW....BB"
+   ]
+  },
+  "frame08": {
+   "corners": [
+    [
+     442.0,
+     388.4
+    ],
+    [
+     136.1,
+     240.0
+    ],
+    [
+     345.0,
+     90.0
+    ],
+    [
+     607.2,
+     180.5
+    ]
+   ],
+   "occupancy": [
+    "WW....BB",
+    ".W....BB",
+    "W.WW..BB",
+    "W..W..BB",
+    "WW....BB",
+    "WW...BBB",
+    "WW...B..",
+    "WW....BB"
+   ]
+  },
+  "frame09": {
+   "corners": [
+    [
+     476.8,
+     380.1
+    ],
+    [
+     40.7,
+     308.3
+    ],
+    [
+     200.4,
+     66.3
+    ],
+    [
+     523.9,
+     105.1
+    ]
+   ],
+   "occupancy": [
+    "WW..B..B",
+    ".W....BB",
+    "..WW..BB",
+    "W...WB.B",
+    "WW.WB...",
+    ".WW..BBB",
+    ".W..WBBB",
+    "WW...B.."
+   ]
+  },
+  "frame20": {
+   "corners": [
+    [
+     1186.9,
+     699.8
+    ],
+    [
+     210.9,
+     680.5
+    ],
+    [
+     344.9,
+     60.2
+    ],
+    [
+     1087.4,
+     71.5
+    ]
+   ],
+   "occupancy": [
+    ".W...B..",
+    ".W...B..",
+    "W..WB.B.",
+    "W..W...B",
+    ".W...BB.",
+    ".WW..BB.",
+    "W.W...BB",
+    ".W....B."
+   ]
+  }
+ }
+}

@@ -1,0 +1,6 @@
+# Démo seule, CPU. Mêmes bornes que le pipeline (OpenCV 5 / NumPy 2 non testés).
+fastapi>=0.110,<1
+uvicorn[standard]>=0.29,<1
+python-multipart>=0.0.9,<1
+numpy>=1.24,<2
+opencv-python-headless>=4.8,<5

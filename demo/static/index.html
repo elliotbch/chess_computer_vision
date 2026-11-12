@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vision d'échiquier</title>
+<meta name="description" content="Identifier, coup par coup, le type de pièces d'échecs remplacées par des marqueurs identiques, à partir de leurs seuls déplacements ; trouver l'échiquier sur une photo et détecter les cases occupées.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #f7f8fa; --card: #ffffff; --border: #e3e6ec; --text: #1b2333; --muted: #5b6475;
+  --accent: #1e3a5f; --accent-soft: #e8eef6; --ok: #1f7a4d; --warn: #b54708;
+  --light-sq: #eef1f5; --dark-sq: #9aa8bb;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f141c; --card: #171e29; --border: #2a3342; --text: #e6e9ef; --muted: #a3acbb;
+          --accent: #8fb3e0; --accent-soft: #1f2a3a; --ok: #4cc38a; --warn: #f0a35c;
+          --light-sq: #c9d2de; --dark-sq: #6d7d93; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+       font: 15px/1.55 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 48px; }
+header h1 { margin: 0 0 6px; font-size: 1.6rem; letter-spacing: -0.01em; }
+header p { margin: 0 0 10px; color: var(--muted); max-width: 780px; }
+.links { display: flex; gap: 16px; flex-wrap: wrap; font-weight: 500; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; margin-top: 18px; }
+.card h2 { margin: 0 0 12px; font-size: 1.1rem; }
+.examples { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.ex { border: 2px solid var(--border); border-radius: 10px; padding: 0; background: var(--card); cursor: pointer; text-align: left; color: var(--text); font: inherit; overflow: hidden; }
+.ex img { display: block; width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+.ex span { display: block; padding: 6px 8px; font-size: .85rem; font-weight: 500; }
+.ex[aria-pressed="true"] { border-color: var(--accent); }
+button.btn { font: inherit; border-radius: 8px; border: 1px solid var(--accent); background: var(--card); color: var(--accent); padding: 7px 13px; cursor: pointer; font-weight: 500; }
+button.btn.primary, button.btn[aria-pressed="true"] { background: var(--accent); color: var(--card); }
+button.btn:disabled { opacity: .45; cursor: default; }
+.upload { margin-top: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; color: var(--muted); }
+.upload input { max-width: 100%; }
+.status { margin-top: 10px; min-height: 1.4em; color: var(--muted); }
+.status.error { color: var(--warn); font-weight: 500; }
+.results { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: 16px; margin-top: 16px; }
+.panel { min-width: 0; }
+.panel h3 { margin: 0 0 6px; font-size: .95rem; color: var(--muted); font-weight: 600; }
+.panel img { display: block; width: 100%; height: auto; border-radius: 8px; border: 1px solid var(--border); }
+.facts { display: flex; gap: 18px; flex-wrap: wrap; font-size: .9rem; color: var(--muted); margin-top: 12px; }
+.facts b { color: var(--text); }
+.board-wrap { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+.board { display: grid; grid-template-columns: 18px repeat(8, minmax(0, 1fr)); width: min(100%, 360px); font-size: .75rem; color: var(--muted); }
+.board .sq { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; font-size: clamp(18px, 5.2vw, 30px); line-height: 1; position: relative; }
+.board .l { background: var(--light-sq); } .board .d { background: var(--dark-sq); }
+.board .lab { display: flex; align-items: center; justify-content: center; }
+.board .sq.wrong::after { content: ""; position: absolute; inset: 2px; border: 2px solid var(--warn); border-radius: 3px; }
+.board .sq.moved { box-shadow: inset 0 0 0 3px rgba(30, 140, 255, .55); }
+.pc-w { color: #fff; text-shadow: 0 0 2px #000, 0 0 1px #000; }
+.pc-b { color: #111; text-shadow: 0 0 2px rgba(255,255,255,.7); }
+.unk { font-size: .62em; font-weight: 700; width: 66%; height: 66%; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.unk.w { background: #fff; color: #111; border: 2px solid #111; } .unk.b { background: #111; color: #fff; border: 2px solid #fff; }
+.seqbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.seqbar input[type=range] { flex: 1 1 200px; accent-color: var(--accent); }
+.move { font-size: 1.05rem; font-weight: 600; }
+code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; word-break: break-all; }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; margin-top: 8px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+td.num { font-variant-numeric: tabular-nums; }
+.small { font-size: .85rem; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+.mk { width: 84%; height: 84%; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.05; position: relative; }
+.mk.w { background: #fff; color: #111; border: 2px solid #111; } .mk.b { background: #1b1f27; color: #f2f2f2; border: 2px solid #f2f2f2; }
+.mk .glyph { font-size: clamp(16px, 4.4vw, 26px); }
+.mk .mp { font-size: clamp(12px, 3vw, 17px); font-weight: 800; opacity: .8; }
+.mk .mp small { font-size: .6em; font-weight: 600; }
+.mk .cands { font-size: clamp(6px, 1.5vw, 8.5px); letter-spacing: .03em; font-weight: 500; white-space: nowrap; max-width: 92%; overflow: hidden; }
+.mk.certain { box-shadow: 0 0 0 2px var(--ok); }
+.sq.fresh .mk { box-shadow: 0 0 0 4px var(--ok); animation: pop .5s ease-out; }
+@keyframes pop { from { transform: scale(.6); } to { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .sq.fresh .mk { animation: none; } }
+.truth { position: absolute; left: 2px; bottom: 1px; font-size: 9px; font-weight: 700; color: #111; background: rgba(255,255,255,.85); border-radius: 3px; padding: 0 2px; }
+.board .sq.from { box-shadow: inset 0 0 0 3px rgba(30, 140, 255, .55); }
+.board.big { width: min(100%, 440px); }
+.replay-grid { display: grid; grid-template-columns: minmax(0, 440px) minmax(0, 1fr); gap: 20px; align-items: start; margin-top: 10px; }
+.stat { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; font-size: .9rem; }
+.stat b { font-variant-numeric: tabular-nums; }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: .8rem; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 18px; height: 3px; vertical-align: middle; margin-right: 5px; border-radius: 2px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.log { max-height: 220px; overflow-y: auto; font-size: .85rem; margin: 6px 0 0; padding-left: 18px; }
+.log li.cur { font-weight: 700; }
+.import { margin-top: 10px; }
+.import summary { cursor: pointer; font-weight: 600; color: var(--accent); }
+.import textarea, .import input[type=text] { width: 100%; font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; border: 1px solid var(--border); border-radius: 8px; padding: 8px; background: var(--bg); color: var(--text); }
+.import label { display: block; margin: 8px 0 4px; font-size: .85rem; color: var(--muted); }
+.startbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+.startbar input[type=range] { flex: 1 1 220px; accent-color: var(--accent); }
+.chk { font-size: .85rem; color: var(--muted); display: inline-flex; gap: 6px; align-items: center; }
+#gameButtons { display: flex; gap: 8px; flex-wrap: wrap; }
+@media (max-width: 760px) { .results, .replay-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>Vision d'échiquier : pièces inconnues</h1>
+  <p>Les pièces sont remplacées par des marqueurs identiques (un par camp, des post-it par exemple) : seul le camp est visible. La démo déduit le type de chaque marqueur de ses seuls déplacements, coup par coup, même si l'observation commence en cours de partie, et sépare les pièces identifiées avec certitude des types seulement probables. Elle montre aussi l'étape de vision : trouver l'échiquier sur une photo et détecter les cases occupées.</p>
+  <div class="links">
+    <a href="https://github.com/elliotbch/chess_computer_vision">Code sur GitHub</a>
+    <a href="https://www.malt.fr/profile/elliotbouchy1">Elliot Bouchy sur Malt</a>
+  </div>
+</header>
+
+<section class="card" aria-labelledby="seq">
+  <h2 id="seq">Essayer : identifier les pièces inconnues coup par coup</h2>
+  <p class="small" style="margin-top:0">Le moteur ne reçoit que l'occupation des cases (marqueur blanc, marqueur noir, vide) après chaque coup : ni les types, ni la position de départ, ni les droits de roque. Un marqueur dont tous les types sauf un sont exclus par les règles est <b>identifié avec certitude</b> (symbole de la pièce) ; sinon, la grande lettre suivie de « ? » donne le type le plus probable et la petite ligne les types encore possibles (R roi, D dame, T tour, F fou, C cavalier, P pion). Survolez un marqueur pour les probabilités.</p>
+  <div id="gameButtons" role="group" aria-label="Parties d'exemple"></div>
+  <details class="import">
+    <summary>Importer une partie (PGN, ou FEN + coups)</summary>
+    <label for="pgnIn">PGN (coups en notation algébrique ; une balise [FEN "…"] est prise en compte)</label>
+    <textarea id="pgnIn" rows="4" placeholder="1. e4 e5 2. Nf3 Nc6 3. Bb5 a6 …"></textarea>
+    <label for="fenIn">Ou une position FEN…</label>
+    <input type="text" id="fenIn" placeholder="r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3">
+    <label for="movesIn">…suivie des coups (Nf3, exd5, O-O, ou e2e4, e7e8q)</label>
+    <textarea id="movesIn" rows="2" placeholder="Bb5 a6 Ba4 Nf6 O-O"></textarea>
+    <div style="margin-top:8px"><button class="btn primary" type="button" id="importBtn">Rejouer cette partie</button></div>
+  </details>
+  <div class="startbar" id="startBar" hidden>
+    <label for="startRange">Commencer l'observation au&nbsp;:</label>
+    <input type="range" id="startRange" min="0" max="0" value="0">
+    <b id="startLabel"></b>
+  </div>
+  <div class="status" id="replayStatus" role="status" aria-live="polite"></div>
+  <div id="seqView" hidden>
+    <div class="seqbar">
+      <button class="btn" id="prev" aria-label="Demi-coup précédent">◀ Préc.</button>
+      <input type="range" id="stepRange" min="0" max="0" value="0" aria-label="Demi-coups observés">
+      <button class="btn" id="next" aria-label="Demi-coup suivant">Suiv. ▶</button>
+      <button class="btn primary" id="playSeq">Lecture</button>
+    </div>
+    <div class="move" id="moveText" aria-live="polite"></div>
+    <div class="replay-grid">
+      <div>
+        <div class="board big" id="dedBoard" aria-label="Marqueurs et types déduits"></div>
+        <label class="chk" style="margin-top:8px"><input type="checkbox" id="showTruth"> Afficher le vrai type (petite étiquette, pour vérifier)</label>
+      </div>
+      <div>
+        <div class="stat" id="seqFacts"></div>
+        <h3 class="small" style="margin:14px 0 4px">Pièces identifiées / demi-coups observés</h3>
+        <div class="chart" id="chart"></div>
+        <div class="legend" id="chartLegend"></div>
+        <h3 class="small" style="margin:14px 0 0">Journal des identifications certaines</h3>
+        <ol class="log" id="identLog"></ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="try">
+  <h2 id="try">Étape de vision : analyser une photo</h2>
+  <div class="examples" id="examples" role="group" aria-label="Photos d'exemple"></div>
+  <div class="upload">
+    <label for="file">Ou importez la photo d'un plateau portant les pastilles d'orientation rose et bleue (JPEG/PNG, 12&nbsp;Mo au maximum)&nbsp;:</label>
+    <input type="file" id="file" accept="image/jpeg,image/png">
+  </div>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+  <div id="result" hidden>
+    <div class="results">
+      <div class="panel"><h3>Plateau détecté : coins et grille</h3><img id="inputImg" alt="Photo d'entrée avec la grille et les coins du plateau détectés"></div>
+      <div class="panel"><h3>Vue de dessus : cases occupées (disque blanc = camp blanc, disque noir = camp noir)</h3><img id="topImg" alt="Vue de dessus redressée du plateau, cases occupées encadrées"></div>
+    </div>
+    <div class="facts" id="facts"></div>
+    <div class="board-wrap" style="margin-top:14px">
+      <div><h3 class="small" style="margin:0 0 6px">Occupation sous forme de diagramme (types inconnus à partir d'une seule photo)</h3><div class="board" id="photoBoard" aria-label="Diagramme d'occupation détecté"></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="card" aria-labelledby="how">
+  <h2 id="how">Comment ça marche</h2>
+  <ul>
+    <li><b>Calibration :</b> les marqueurs colorés sont effacés par inpainting, puis <code>findChessboardCornersSB</code> d'OpenCV cherche les 7×7 coins intérieurs. Si une main cache une partie du plateau, une sous-grille plus petite est acceptée et sa position dans le plateau 8×8 est choisie en vérifiant l'alternance clair/foncé. Les pastilles rose et bleue donnent l'orientation (a1, a8).</li>
+    <li><b>Vue de dessus :</b> une homographie projette le plateau sur une image de 800×800 (100&nbsp;px par case).</li>
+    <li><b>Occupation :</b> pour chaque case, écart de couleur entre le centre et le bord, saturation, densité de contours et contraste ; une régression logistique à 4 variables (ou un seuil adaptatif) décide vide / occupée ; la teinte du marqueur donne le camp.</li>
+    <li><b>Pièces inconnues :</b> chaque marqueur est une variable dont le domaine est l'ensemble des types encore possibles. Chaque coup observé restreint le marqueur qui bouge (géométrie, sans saut sauf le cavalier ; pion : avance, double pas depuis sa 2e rangée, prise en diagonale, en passant, promotion ; le roque désigne le roi et la tour). S'y ajoutent des règles vraies dans toute position : un seul roi par camp, jamais de pion sur la 1re ou la 8e rangée, pions + pièces promues en surplus ≤ 8 (fous comptés par couleur de case), 32 marqueurs présents donc aucune promotion, le camp qui vient de jouer n'est pas en échec. Les exclusions se propagent (couplage marqueurs / pièces pour le dénombrement) : une certitude est une preuve, jamais un pari.</li>
+    <li><b>Le plus probable :</b> pour les marqueurs encore ambigus, une régression logistique apprise sur 4 000 parties lichess (licence CC0), distinctes des parties de test, classe les types restants. Elle tient compte de la case actuelle du marqueur ; elle ne sert jamais aux certitudes.</li>
+  </ul>
+  <h3 class="small" style="margin:14px 0 0">Résultats mesurés</h3>
+  <div class="tablewrap"><table id="metricsTable"><tbody><tr><td>Chargement…</td></tr></tbody></table></div>
+  <p class="small" id="metricsNote"></p>
+</section>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const ms = (v) => `${Number(v).toLocaleString("fr-FR")}\u00a0ms`;
+  const GLYPH = { 1: "♟", 2: "♜", 3: "♞", 4: "♝", 5: "♚", 6: "♛" };
+  let exButtons = [], seq = null, seqTimer = 0;
+
+  function setStatus(msg, err = false) { $("status").textContent = msg; $("status").classList.toggle("error", err); }
+
+  function renderBoard(el, cellFn) {
+    el.innerHTML = "";
+    for (let r = 0; r < 8; r++) {
+      const lab = document.createElement("div"); lab.className = "lab"; lab.textContent = 8 - r; el.appendChild(lab);
+      for (let c = 0; c < 8; c++) {
+        const d = document.createElement("div");
+        d.className = "sq " + ((r + c) % 2 === 0 ? "l" : "d");
+        cellFn(d, r, c);
+        el.appendChild(d);
+      }
+    }
+    el.appendChild(document.createElement("div"));
+    "abcdefgh".split("").forEach((f) => { const l = document.createElement("div"); l.className = "lab"; l.textContent = f; el.appendChild(l); });
+  }
+
+  function pieceInto(d, v) {
+    if (!v) return;
+    const side = v > 0 ? "w" : "b";
+    const a = Math.abs(v);
+    if (a >= 1 && a <= 6) {
+      const s = document.createElement("span"); s.className = "pc-" + side; s.textContent = GLYPH[a];
+      s.setAttribute("aria-label", ["", "pion", "tour", "cavalier", "fou", "roi", "dame"][a] + (a === 2 || a === 6 ? (side === "w" ? " blanche" : " noire") : (side === "w" ? " blanc" : " noir")));
+      d.appendChild(s);
+    } else {
+      const s = document.createElement("span"); s.className = "unk " + side; s.textContent = "?";
+      s.setAttribute("aria-label", "pièce " + (side === "w" ? "blanche" : "noire") + ", type inconnu"); d.appendChild(s);
+    }
+  }
+
+  // ---------------- photo analysis
+  function showAnalysis(res, label) {
+    $("result").hidden = false;
+    $("inputImg").src = res.input_image;
+    if (!res.calibrated) {
+      $("topImg").removeAttribute("src");
+      $("facts").innerHTML = `<span>Calibration <b>échouée</b> (${ms(res.timing_ms.total)})</span>`;
+      $("photoBoard").innerHTML = "";
+      setStatus(`${label} : ${res.message}`, true);
+      return;
+    }
+    $("topImg").src = res.top_view;
+    const st = res.stickers || {};
+    $("facts").innerHTML =
+      `<span>Cases occupées : <b>${res.occupied}</b> (blanches <b>${res.white}</b>, noires <b>${res.black}</b>)</span>` +
+      `<span>Recherche du plateau : <b>${res.method}</b></span>` +
+      `<span>Pastilles : rose <b>${st.rose ? "trouvée" : "introuvable"}</b>, bleue <b>${st.blue ? "trouvée" : "introuvable"}</b></span>` +
+      `<span>Détecteur : <b>${res.detector}</b></span>` +
+      `<span>Temps : <b>${ms(res.timing_ms.total)}</b> (calibration ${ms(res.timing_ms.calibration)})</span>`;
+    renderBoard($("photoBoard"), (d, r, c) => { const v = res.board[r][c]; if (v === "W") pieceInto(d, 7); else if (v === "B") pieceInto(d, -7); });
+    setStatus(`${label} : plateau trouvé et analysé.`);
+  }
+
+  async function analyse(body, label) {
+    setStatus(`Analyse de « ${label} »…`);
+    try {
+      const r = await fetch("api/analyze", { method: "POST", body });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `erreur ${r.status}`);
+      showAnalysis(j, label);
+    } catch (e) { setStatus(`Impossible d'analyser « ${label} » : ${e.message}`, true); }
+  }
+
+  $("file").addEventListener("change", (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    if (f.size > 12 * 1024 * 1024) { setStatus("Image trop volumineuse : la démo accepte au plus 12 Mo.", true); return; }
+    exButtons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+    const fd = new FormData(); fd.append("file", f); analyse(fd, f.name);
+  });
+
+  // ---------------- replay : pièces inconnues
+  const FR = { P: "P", N: "C", B: "F", R: "T", Q: "D", K: "R" };
+  const FRNAME = { P: "pion", N: "cavalier", B: "fou", R: "tour", Q: "dame", K: "roi" };
+  const GLYPHL = { P: "♟", N: "♞", B: "♝", R: "♜", Q: "♛", K: "♚" };
+  let req = null, total = 0, firstTurn = "w";
+  const sqIdx = (name) => [8 - Number(name[1]), "abcdefgh".indexOf(name[0])];
+  const pct0 = (a, b) => b ? Math.round(100 * a / b) + " %" : "–";
+
+  function moveLabel(ply) {
+    const k = ply + (firstTurn === "b" ? 1 : 0);
+    return `coup ${1 + Math.floor(k / 2)}, trait aux ${k % 2 === 0 ? "Blancs" : "Noirs"}`;
+  }
+
+  function setReplayStatus(msg, err = false) { $("replayStatus").textContent = msg; $("replayStatus").classList.toggle("error", err); }
+
+  function markerInto(d, m, k) {
+    const disc = document.createElement("span");
+    disc.className = "mk " + m.c + (m.certain ? " certain" : "");
+    const side = m.c === "w" ? "blanc" : "noir";
+    if (m.certain) {
+      const g = document.createElement("span"); g.className = "glyph"; g.textContent = GLYPHL[m.certain]; disc.appendChild(g);
+      disc.setAttribute("aria-label", `marqueur ${side} n°${m.id} : ${FRNAME[m.certain]}, identifié avec certitude au demi-coup ${m.since}`);
+      disc.title = `Marqueur ${side} n°${m.id} : ${FRNAME[m.certain]} (certain depuis le demi-coup ${m.since})`;
+      if (m.since === k && k > 0) d.classList.add("fresh");
+    } else {
+      if (m.mp) {
+        const b = document.createElement("span"); b.className = "mp"; b.innerHTML = `${FR[m.mp]}<small>?</small>`; disc.appendChild(b);
+      }
+      const c = document.createElement("span"); c.className = "cands";
+      c.textContent = m.cand.map((t) => FR[t]).join("");
+      disc.appendChild(c);
+      const prob = m.mp ? ` ; le plus probable : ${FRNAME[m.mp]} (${Math.round(100 * m.p)} %)` : "";
+      disc.setAttribute("aria-label", `marqueur ${side} n°${m.id}, types possibles : ${m.cand.map((t) => FRNAME[t]).join(", ")}${prob}`);
+      disc.title = `Marqueur ${side} n°${m.id}\nPossibles : ${m.cand.map((t) => FRNAME[t]).join(", ")}${prob}`;
+    }
+    d.appendChild(disc);
+    if ($("showTruth").checked) {
+      const t = document.createElement("span"); t.className = "truth"; t.textContent = FR[m.truth]; t.setAttribute("aria-hidden", "true"); d.appendChild(t);
+    }
+    if (m.certain && m.certain !== m.truth) d.classList.add("wrong");
+  }
+
+  function drawChart(k) {
+    const st = seq.steps, n = st.length, W = 560, H = 220, L = 38, R = 10, T = 10, B = 40;
+    const x = (i) => L + (n > 1 ? i / (n - 1) : 0) * (W - L - R), y = (v) => T + (1 - v) * (H - T - B);
+    const line = (f) => st.map((s, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(f(s)).toFixed(1)}`).join("");
+    let g = "";
+    for (const v of [0, .25, .5, .75, 1]) g += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--border)"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="11" fill="var(--muted)">${v * 100} %</text>`;
+    const step = Math.max(1, Math.ceil((n - 1) / 8 / 5) * 5);
+    for (let i = 0; i < n; i += step) g += `<text x="${x(i)}" y="${H - 12}" text-anchor="middle" font-size="11" fill="var(--muted)">${i}</text>`.replace(`y="${H - 12}"`, `y="${H - B + 16}"`);
+    g += `<text x="${(L + W - R) / 2}" y="${H - 3}" text-anchor="middle" font-size="11" fill="var(--muted)">demi-coups observés</text>`;
+    if (seq.prior) g += `<path d="${line((s) => s.mp_correct / s.present)}" fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="2 3"/>`;
+    g += `<path d="${line((s) => s.old_identified / s.present)}" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="6 4"/>`;
+    g += `<path d="${line((s) => s.certain / s.present)}" fill="none" stroke="var(--accent)" stroke-width="3"/>`;
+    g += `<line x1="${x(k)}" x2="${x(k)}" y1="${T}" y2="${H - B}" stroke="var(--warn)" stroke-width="1.5"/>`;
+    $("chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Part des marqueurs identifiés avec certitude en fonction du nombre de demi-coups observés">${g}</svg>`;
+    $("chartLegend").innerHTML = `<span><i style="background:var(--accent)"></i>identifiées avec certitude</span>` +
+      (seq.prior ? `<span><i style="background:var(--ok)"></i>type le plus probable correct</span>` : "") +
+      `<span><i style="background:var(--muted)"></i>ancienne logique du dépôt (types déduits, faux compris)</span>`;
+  }
+
+  function showStep(k) {
+    const s = seq.steps[k];
+    $("stepRange").value = k;
+    $("prev").disabled = k === 0; $("next").disabled = k === seq.steps.length - 1;
+    $("moveText").textContent = k === 0 ? `Début de l'observation (${moveLabel(seq.start_ply)}) : seul le camp de chaque marqueur est connu.`
+      : `Demi-coup observé ${k} (${moveLabel(s.ply - 1)}) : ${s.move}` + (s.new.length ? ` · identifié : ${s.new.map((x) => `${x.sq} = ${FRNAME[x.type]}`).join(", ")}` : "");
+    const by = {};
+    s.markers.forEach((m) => { const [r, c] = sqIdx(m.sq); by[r * 8 + c] = m; });
+    const prevS = k > 0 ? seq.steps[k - 1] : null;
+    const prevOcc = {};
+    if (prevS) prevS.markers.forEach((m) => { prevOcc[m.sq] = true; });
+    renderBoard($("dedBoard"), (d, r, c) => {
+      const m = by[r * 8 + c];
+      const name = "abcdefgh"[c] + (8 - r);
+      if (prevS && prevOcc[name] && !m) d.classList.add("from");
+      if (m) markerInto(d, m, k);
+    });
+    const unc = s.present - s.certain;
+    $("seqFacts").innerHTML =
+      `<span>Marqueurs sur le plateau</span><b>${s.present}</b>` +
+      `<span>Identifiés avec certitude</span><b>${s.certain} (${pct0(s.certain, s.present)})</b>` +
+      `<span>dont faux</span><b>${s.certain_wrong}</b>` +
+      (seq.prior ? `<span>Le plus probable correct (tous)</span><b>${s.mp_correct} / ${s.present}</b>` : `<span>Le plus probable</span><b>a priori indisponible</b>`) +
+      `<span>Ancienne logique : types déduits</span><b>${s.old_identified} (dont ${s.old_wrong} faux)</b>` +
+      `<span>Temps de calcul de ce demi-coup</span><b>${String(s.ms).replace(".", ",")} ms</b>`;
+    drawChart(k);
+    const log = $("identLog");
+    log.querySelectorAll("li").forEach((li) => li.classList.toggle("cur", +li.dataset.k === k));
+  }
+
+  function buildLog() {
+    const log = $("identLog"); log.innerHTML = "";
+    seq.steps.forEach((s, k) => {
+      if (!s.new.length) return;
+      const li = document.createElement("li"); li.dataset.k = k;
+      let txt = s.new.map((x) => `${x.sq} ${FRNAME[x.type]}`).join(", ");
+      if (s.new.length > 4) {
+        const cnt = {};
+        s.new.forEach((x) => { cnt[x.type] = (cnt[x.type] || 0) + 1; });
+        txt = `${s.new.length} marqueurs : ` + Object.entries(cnt).map(([t, n]) => `${n} ${FRNAME[t]}${n > 1 ? "s" : ""}`).join(", ");
+      }
+      li.textContent = (k === 0 ? "dès le début" : `demi-coup ${k}`) + " : " + txt;
+      li.style.cursor = "pointer"; li.addEventListener("click", () => { stopSeq(); showStep(k); });
+      log.appendChild(li);
+    });
+    if (!log.children.length) log.innerHTML = "<li>aucune pour l'instant</li>";
+  }
+
+  function stopSeq() { clearInterval(seqTimer); seqTimer = 0; $("playSeq").textContent = "Lecture"; }
+
+  async function runReplay(body, keepStart) {
+    stopSeq();
+    setReplayStatus("Calcul du rejeu…");
+    try {
+      const r = await fetch("api/replay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || `erreur ${r.status}`);
+      seq = j; req = body; total = j.total_plies; firstTurn = j.first_turn;
+      $("startBar").hidden = false;
+      $("startRange").max = Math.max(0, total - 1); $("startRange").value = j.start_ply; $("startLabel").textContent = moveLabel(j.start_ply);
+      $("seqView").hidden = false; $("stepRange").max = j.steps.length - 1;
+      buildLog(); showStep(0);
+      setReplayStatus(`${j.label} : ${j.steps.length - 1} demi-coups observés à partir du ${moveLabel(j.start_ply)} (calcul ${ms(j.timing_ms)}).` +
+        (j.resets ? ` Observation incohérente : remise à zéro ${j.resets} fois.` : ""));
+    } catch (e) { setReplayStatus(`Impossible de rejouer : ${e.message}`, true); }
+  }
+
+  $("startRange").addEventListener("input", (e) => { $("startLabel").textContent = moveLabel(+e.target.value); });
+  $("startRange").addEventListener("change", (e) => { if (req) runReplay(Object.assign({}, req, { start_ply: +e.target.value })); });
+  $("importBtn").addEventListener("click", () => {
+    document.querySelectorAll("#gameButtons button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    const pgn = $("pgnIn").value.trim(), fen = $("fenIn").value.trim(), moves = $("movesIn").value.trim();
+    if (!pgn && !moves) { setReplayStatus("Collez un PGN, ou une FEN suivie de coups.", true); return; }
+    runReplay(pgn ? { pgn, start_ply: 0 } : { fen, moves, start_ply: 0 });
+  });
+  $("showTruth").addEventListener("change", () => showStep(+$("stepRange").value));
+  $("prev").addEventListener("click", () => { stopSeq(); showStep(Math.max(0, +$("stepRange").value - 1)); });
+  $("next").addEventListener("click", () => { stopSeq(); showStep(Math.min(seq.steps.length - 1, +$("stepRange").value + 1)); });
+  $("stepRange").addEventListener("input", (e) => { stopSeq(); showStep(+e.target.value); });
+  $("playSeq").addEventListener("click", () => {
+    if (seqTimer) { stopSeq(); return; }
+    if (+$("stepRange").value >= seq.steps.length - 1) showStep(0);
+    $("playSeq").textContent = "Pause";
+    seqTimer = setInterval(() => { const i = +$("stepRange").value + 1; if (i >= seq.steps.length) { stopSeq(); return; } showStep(i); }, 800);
+  });
+
+  // ---------------- metrics
+  function pct(v) { return v == null ? "–" : (100 * v).toLocaleString("fr-FR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "\u00a0%"; }
+  fetch("api/metrics").then((r) => r.ok ? r.json() : Promise.reject()).then((m) => {
+    const ev = m.evaluation, t = ev.results.test, syn = ev.results.test_synthetic_views;
+    const best = t.v2_logreg ? "v2_logreg" : "v2_rule";
+    const pi = m.piece_identification;
+    const rows = [];
+    if (pi) {
+      const L = pi.lichess_test, starts = pi.protocol.observation_starts_at_move;
+      const at = (k, meth) => starts.map((n) => { const v = L[String(n)][meth].curve_summary[String(k)]; return v == null ? "–" : pct(v); }).join(" · ");
+      const all = pi.lichess_test_all_starts;
+      rows.push([`Pièces identifiées avec certitude après 20 demi-coups observés, observation à partir du coup ${starts.join(" · ")} (${pi.protocol.test_games} parties lichess de test) : nouveau moteur`, at(20, "new")]);
+      rows.push([`Idem, ancienne logique du dépôt (types déduits, faux compris)`, at(20, "old")]);
+      rows.push([`Idem après 40 demi-coups : nouveau moteur`, at(40, "new")]);
+      rows.push([`Idem après 40 demi-coups : ancienne logique`, at(40, "old")]);
+      rows.push(["Identifications certaines fausses, tous départs confondus : nouveau moteur", `${all.new.certain_wrong_total.toLocaleString("fr-FR")} sur ${all.new.certain_total.toLocaleString("fr-FR")}`]);
+      rows.push(["Types déduits faux, tous départs confondus : ancienne logique", `${all.old.certain_wrong_total.toLocaleString("fr-FR")} sur ${all.old.certain_total.toLocaleString("fr-FR")}`]);
+      if (all.new.most_probable_accuracy_on_uncertain != null) rows.push(["Type « le plus probable » correct, pour les marqueurs non identifiés", pct(all.new.most_probable_accuracy_on_uncertain)]);
+      rows.push(["Temps de calcul par demi-coup (moyenne, nouveau moteur avec a priori)", `${all.new.ms_per_ply.mean.toLocaleString("fr-FR", { maximumFractionDigits: 1 })}\u00a0ms`]);
+      const ann = pi.annotated_games, a1 = Object.keys(ann).map((g) => ann[g].by_start["1"]).filter(Boolean);
+      if (a1.length) rows.push(["Les 2 parties annotées du dépôt, observées dès le coup 1 : identifiées avec certitude à la fin (nouveau · ancien)",
+        a1.map((x) => `${pct(x.new.curve[x.new.curve.length - 1].certain_share)} · ${pct(x.old.curve[x.old.curve.length - 1].certain_share)}`).join(" ; ")]);
+    }
+    rows.push(["Vision : calibration du plateau réussie (photos de test)", `${t[best].calibration_success}/${t[best].images}`]);
+    rows.push(["Vision : calibration sur " + (syn ? syn.views : "–") + " vues synthétiques des photos de test", syn ? pct(syn.v2_success_rate) : "–"]);
+    rows.push(["Vision : exactitude de l'occupation des cases, de bout en bout (test)", pct(t[best].occupancy_accuracy_end_to_end)]);
+    rows.push(["Vision : exactitude vide / blanc / noir avec coins annotés (test)", pct(t[best].three_class_accuracy_gt_corners)]);
+    $("metricsTable").innerHTML = "<thead><tr><th>Métrique</th><th>Résultat</th></tr></thead><tbody>" +
+      rows.map((r) => `<tr><td>${r[0]}</td><td class="num">${r[1]}</td></tr>`).join("") + "</tbody>";
+    $("metricsNote").textContent = `Pièces inconnues : parties lichess (licence CC0) jamais vues à l'entraînement de l'a priori, observées pendant au plus 60 demi-coups ; le moteur ne reçoit que l'occupation des cases. Une identification certaine est une déduction logique : il n'y en a eu aucune de fausse. L'ancienne logique supposait les effectifs de départ (8 pions, 2 fous…), d'où ses erreurs quand l'observation commence en cours de partie. Vision : ${t.v1_original.images} photos de test (${t.v1_original.squares_evaluated} cases), petit échantillon, chiffres indicatifs.`;
+  }).catch(() => { $("metricsTable").innerHTML = "<tbody><tr><td>Fichier de métriques indisponible.</td></tr></tbody>"; });
+
+  // ---------------- init
+  fetch("api/examples").then((r) => r.json()).then((d) => {
+    const box = $("examples");
+    d.examples.forEach((ex) => {
+      const b = document.createElement("button");
+      b.className = "ex"; b.type = "button"; b.setAttribute("aria-pressed", "false");
+      b.innerHTML = `<img src="${ex.url}" alt="" loading="lazy"><span>${ex.label}</span>`;
+      b.title = ex.note;
+      b.addEventListener("click", () => {
+        exButtons.forEach((x) => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true");
+        const fd = new FormData(); fd.append("example", ex.id); analyse(fd, ex.label);
+      });
+      box.appendChild(b); exButtons.push(b);
+    });
+    const gbox = $("gameButtons");
+    d.games.forEach((g, i) => {
+      const b = document.createElement("button"); b.className = "btn"; b.type = "button"; b.textContent = g.label; b.title = g.note;
+      b.setAttribute("aria-pressed", "false");
+      b.addEventListener("click", () => {
+        gbox.querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", "false")); b.setAttribute("aria-pressed", "true");
+        runReplay({ game: g.id, start_ply: 0 });
+      });
+      gbox.appendChild(b);
+      if (i === 0) b.click();
+    });
+    if (exButtons.length) exButtons[0].click();
+  });
+})();
+</script>
+</body>
+</html>
